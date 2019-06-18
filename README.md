@@ -162,8 +162,37 @@ Events:           <none>
 
 
 
-
 ##Create a namespace and deploy the mediawiki application (or any other application which you think is more suitable to showcase your ability, kindly justify why you have chosen a different application) on the cluster.
+
+Step 1: Create a namespace for the mediawiki application
+
+$ kubectl create ns mediawiki
+
+Step 2: Now create a deployment and service defination file which contains both the mysql and mediawiki configurations. It can be found : "mediawiki/mediawiki.yaml"
+
+Step 3: Apply the mediawiki yaml files
+
+$ kubectl apply -f mediawiki.yaml
+
+Step 4: Verify that the service is up and running
+
+$ kubectl get services --namespace mediawiki
+
+NAME            TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+mediawiki-svc   NodePort    10.xxx.xxx.111   <none>        80:31227/TCP   57m
+mysql-svc       ClusterIP   10.xxx.xx.190    <none>        3306/TCP       57m
+
+Step 5: Access the service from the URL: http://<ip>:<port>/index.php/Main_Page
+
+
+
+
+
+
+
+
+
+
 
 We can use a Helm chart that bootstraps a MediaWiki deployment on a Kubernetes cluster using the Helm package manager.
 
@@ -177,7 +206,7 @@ Helm relies on a service called tiller that requires special permission on the k
 
 To create a new service account manifest:
 
-cat <<EoF > ~/environment/rbac.yaml
+cat <<EoF > rbac.yaml
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -200,3 +229,19 @@ subjects:
 EoF
 
 This file can be found under "helm/rbac.yaml"
+
+Next apply the config:
+
+$ kubectl apply -f rbac.yaml
+
+Step 3: Now we can install tiller using the helm tooling
+
+$ helm init --service-account tiller
+
+This will install tiller into the cluster which gives it access to manage resources in your cluster.
+
+To update Helm’s local list of Charts, run:
+
+helm repo update
+
+Step 3:
