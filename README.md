@@ -100,10 +100,9 @@ $ kubectl create -f jenkins/jenkins-service.yaml --namespace=jenkins
 
 Step 6: To validate that creating the service was successful you can invoke:
 
-$ kubectl get services
+$ kubectl get services --namespace=jenkins
 NAME         CLUSTER-IP   EXTERNAL-IP   PORT(S)          AGE
 jenkins      10.0.0.202   <nodes>       8080:30000/TCP   3m
-kubernetes   10.0.0.1     <none>        443/TCP          6h
 
 Step 7: Now if you browse to any one of the Node IP on port 30000, you will be able to access the Jenkins dashboard.
 
@@ -228,26 +227,15 @@ $ kubectl apply -f docker-secret.yaml --namespace jenkins
 
 
 
+##Deploy an open source vulnerability scanner for docker images scanning within the CI build pipeline.
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-We can use a Helm chart that bootstraps a MediaWiki deployment on a Kubernetes cluster using the Helm package manager.
+We can use a Helm chart that bootstraps a vulnerability scanner deployment on a Kubernetes cluster using the Helm package manager. We shall be using the Anchore Engine here.
 
 Step 1: Configure helm in your local system
 
-brew install kubernetes-helm
+$ brew install kubernetes-helm
+
 
 Step 2: Configure Helm access with RBAC
 
@@ -283,6 +271,7 @@ Next apply the config:
 
 $ kubectl apply -f rbac.yaml
 
+
 Step 3: Now we can install tiller using the helm tooling
 
 $ helm init --service-account tiller
@@ -293,4 +282,93 @@ To update Helm’s local list of Charts, run:
 
 helm repo update
 
-Step 3:
+
+Step 4: We can now install Anchore Engine in Kubernetes with Helm using the Anchore Engine Helm chart. The vaues file can be found: "anchoreEngine/anchorevalues.yaml". To do so, execute:
+
+$ helm install --name anchore-stack anchoreEngine/anchorvalues.yaml --namespace jenkins
+
+Once deployed, it will print a list of instructions and useful commands to connect to the service.
+
+
+Step 5: Now we can check that all the pods are up and running:
+
+$ kubectl get pods --namespace jenkins
+
+NAME                                                  READY     STATUS    RESTARTS   AGE
+anchore-stack-anchore-engine-core-5bf44cb6cd-zxx2k    1/1       Running   0          38m
+anchore-stack-anchore-engine-worker-5f865c7bf-r72vs   1/1       Running   0          38m
+anchore-stack-postgresql-76c87599dc-bbnxn             1/1       Running   0          38m
+
+
+
+Step 6: Then, follow the instructions printed to screen to spawn an ephemeral container that has the anchore-cli tool:
+
+$ ANCHORE_CLI_USER=admin
+
+$ ANCHORE_CLI_PASS=$(kubectl get secret --namespace default anchore-stack-anchore-engine -o jsonpath="{.data.adminPassword}" | base64 --decode; echo)
+
+$ kubectl run -i --tty anchore-cli --restart=Always --image anchore/engine-cli --env ANCHORE_CLI_USER=admin --env ANCHORE_CLI_PASS=${ANCHORE_CLI_PASS} --env ANCHORE_CLI_URL=http://anchore-stack-anchore-engine.jenkins.svc.cluster.local:8228/v1/
+/ anchore-cli system status
+
+
+Step 7: To configure Anchore to scan your private Docker repositories, use the registry subcommand for all the registry-related operations.
+
+$ anchore-cli registry add registry.jenkins.svc.cluster.local <user> <password>
+
+$ anchore-cli registry list
+
+Registry                                   Type             User
+registry.jenkins.svc.cluster.local        docker_v2         admin
+
+
+Step 8: Once that’s complete, we can start pulling and scanning images from the private register:
+
+$ anchore-cli image add registry.jenkins.svc.cluster.local/user/secureclient:latest
+
+Image Digest: sha256:dda434d0e19db72c3277944f92e203fe14f407937ed9f3f9534ec0579ce9cdac
+Analysis Status: analyzed
+Image Type: docker
+Image ID: 5e1be4e7763143e8ff153887d2ae510fe1fee59c9a55392d65f4da73c9626d76
+Dockerfile Mode: Guessed
+Distro: ubuntu
+Distro Version: 18.04
+Size: 127739629
+Architecture: amd64
+Layer Count: 6
+
+Full Tag: registry.jenkins.svc.cluster.local/user/secureclient:latest
+
+
+
+Step 9: We can also do the same step from within jenkins:
+
+We can use the “Anchore Container Image Scanner Plugin” available in the official plugin list that we can access via the Jenkins interface.
+
+Once we have installed the plugin and configured the connection with the Engine, we can include the Anchore evaluation as another (mandatory) step of our pipeline.
+
+This way, the catalog will be automatically up to date and you will be able to detect and retract insecure images before they reach your Docker registry and automated functional tests are run.
+
+Step 10: From the Manage Jenkins -> Configure System menu, you need to configure the connection with the Engine API endpoint and credentials:
+
+In Engine mode:
+
+Engine URl : http://anchore-stack-anchore-engine.jenkins.svc.cluster.local:8228/v1
+Engine Username : admin
+Engine Password: password
+
+
+And as the last step of our build pipeline, we can write the image name, tags and (optionally) Dockerfile path to a workspace local file “anchore_images”:
+
+In a shell we can write:
+
+$ echo "$IMAGENAME:$TAG ${WORKSPACE}/Dockerfile " > anchore_images
+
+After that, you can invoke the Anchore container image scanner in the next build step:
+
+Anchore build options:
+
+image list file : anchore_images
+
+Leave the rest of the options with the default settings.
+
+The build will fail if Anchore detects any stop build vulnerabilities. Of course, you also can define what triggers a stop.
