@@ -438,3 +438,101 @@ Step 8: You can verify everything by accessing at those endpoints:
 http://test.dev.com:30000/app1
 http://test.dev.com:30000/app2
 http://test.dev.com:32000/nginx_status
+
+
+
+## Setup Istio and configure Kiali &amp; Zipkin.
+
+Step 1: Before we can get started configuring Istio we’ll need to first install the command line tools that you will interact with.
+
+$ curl -L https://git.io/getLatestIstio | sh -
+
+// version can be different as istio gets upgraded
+$ cd istio-*
+
+$ sudo mv -v bin/istioctl /usr/local/bin/
+
+Step 2: We need to install Helm and Tiller before installing istio
+
+First create a service account for Tiller.
+
+kubectl apply -f install/kubernetes/helm/helm-service-account.yaml
+
+Step 3: Next we need to install the Custom Resource Definitions, also known as CRDs are API resources which allow you to define custom resources.
+
+$ helm install install/kubernetes/helm/istio-init --name istio-init --namespace istio-system
+
+We can check the installation by running:
+
+$ kubectl get crds --namespace istio-system | grep 'istio.io'
+
+This will return the crds
+
+Step 4: Now lets install Istio’s core components along with Kiali and Zipkin.
+
+This can be done in 2 ways:
+
+1. We can modify the values.yaml file which is present in the location "install/kubernetes/helm/istio/values.yaml" and modify the following values and set them to true :
+
+grafana:
+  enabled: true
+
+prometheus:
+  enabled: true
+
+tracing:
+  enabled: true
+
+kiali:
+  enabled: true
+
+This will enable grafana, prometheus, tracing and Kiali in our istio system.
+
+Then we can use helm to install istio as follows:
+
+$ helm install install/kubernetes/helm/istio --name istio --namespace istio-system
+
+2. We can also enable zipkin, kiali, grafana and prometheus directly from the commandline.
+
+$ helm template --set kiali.enabled=true --set tracing.enabled=true --set tracing.ingress.enabled=true --set tracing.provider=zipkin --set grafana.enabled=true --set prometheus.enabled=true install/kubernetes/helm/istio --name istio --namespace istio-system > $HOME/stash/devopsassignment/istio-1.2.0/istio.yaml
+
+Now we will get the "istio.yaml" file inside the istio-1.2.0 folder.
+
+We can apply the same file:
+
+$ kubectl apply -f $HOME/stash/devopsassignment/istio-1.2.0/istio.yaml
+
+Step 5: You can verify that the services have been deployed and check the corresponding pods
+
+$ kubectl get svc -n istio-system
+
+$ kubectl get pods -n istio-system
+
+NAME                                    READY     STATUS      RESTARTS   AGE
+grafana-7b46bf6b7c-4rh5z                1/1       Running     0          10m
+istio-citadel-75fdb679db-jnn4z          1/1       Running     0          10m
+istio-galley-c864b5c86-sq952            1/1       Running     0          10m
+istio-ingressgateway-668676fbdb-p5c8c   1/1       Running     0          10m
+istio-init-crd-10-zgzn9                 0/1       Completed   0          12m
+istio-init-crd-11-9v626                 0/1       Completed   0          12m
+istio-pilot-f4c98cfbf-v8bss             2/2       Running     0          10m
+istio-policy-6cbbd844dd-ccnph           2/2       Running     1          10m
+istio-telemetry-ccc4df498-pjht7         2/2       Running     1          10m
+prometheus-89bc5668c-f866j              1/1       Running     0          10m
+kiali-5d4b49848-qvdtr                   1/1       Running     0          10m
+zipkin-6cbbd844dd-khzn9                 1/1       Running     0          10m
+
+
+Step 4: For testing (and temporary access), you may also use port-forwarding. Use the following, assuming you’ve deployed Zipkin to the istio-system namespace:
+
+$ kubectl -n istio-system port-forward $(kubectl -n istio-system get pod -l app=zipkin -o jsonpath='{.items[0].metadata.name}') 15032:9411
+
+Now in the local system zipkin dashboard is available in http://localhost:15032.
+
+Step 5: For testing (and temporary access), you may also use port-forwarding. Use the following, assuming you’ve deployed Kiali to the istio-system namespace:
+
+$ kubectl -n istio-system port-forward $(kubectl -n istio-system get pod -l app=kiali -o jsonpath='{.items[0].metadata.name}') 20001:20001
+
+Now in the local system Kiali UI is available in http://localhost:20001/kiali/console.
+
+To log into the Kiali UI, go to the Kiali login screen and enter the username and passphrase which is by default asmin:admin
