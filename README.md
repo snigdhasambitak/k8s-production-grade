@@ -76,7 +76,7 @@ $ kubectl create ns jenkins
 
 Step 3: Apply the deploymnet file that was created at step 1:
 
-$ kubectl create -f jenkins-deployment.yaml --namespace=jenkins
+$ kubectl create -f jenkins/jenkins-deployment.yaml --namespace=jenkins
 
 
 Step 4: To validate that creating the deployment was successful you can invoke:
@@ -96,7 +96,7 @@ Step 4: To make Jenkins accessible outside the Kubernetes cluster the Pod needs 
 
 Step 5: The file is defining a Service as indicated by the kind field. The Service is of type NodePort. Other options are ClusterIP (only accessible within the cluster) and LoadBalancer. The list of ports specified within the spec are a list of ports exposed by this service. To create the service execute:
 
-$ kubectl create -f jenkins-service.yaml --namespace=jenkins
+$ kubectl create -f jenkins/jenkins-service.yaml --namespace=jenkins
 
 Step 6: To validate that creating the service was successful you can invoke:
 
@@ -127,7 +127,7 @@ This may also be found at : /var/jenkins_home/secrets/initialAdminPassword
 
 Step 9: Now we need to create a Horizontal Pod Autoscaler that maintains between 1 and 10 replicas of the Pods controlled by the jenkins deployment we created in the first step. The HPA will increase and decrease the number of replicas (via the deployment) to maintain an average CPU utilization across all Pods of 50% and when Memory is used more than 500Mi. The hpa file can be found as "jenkins-hpa.yaml"
 
-$ kubectl create -f jenkins-hpa.yaml --namespace=jenkins
+$ kubectl create -f jenkins/jenkins-hpa.yaml --namespace=jenkins
 
 Step 10: To get HPA info and description and check that resource metrics data:
 
@@ -172,7 +172,7 @@ Step 2: Now create a deployment and service defination file which contains both 
 
 Step 3: Apply the mediawiki yaml files
 
-$ kubectl apply -f mediawiki.yaml
+$ kubectl apply -f mediawiki/mediawiki.yaml
 
 Step 4: Verify that the service is up and running
 
@@ -183,6 +183,55 @@ mediawiki-svc   NodePort    10.xxx.xxx.111   <none>        80:31227/TCP   57m
 mysql-svc       ClusterIP   10.xxx.xx.190    <none>        3306/TCP       57m
 
 Step 5: Access the service from the URL: http://<ip>:<port>/index.php/Main_Page
+
+
+
+
+
+##Setup a private docker registry to store the docker images. Configure restricted access between cluster to registry and Cluster to pipeline.
+
+Step 1: As we are using AWS so if you want the registry to be persistent, this will require a persistent volume of some kind. I’ll use the example of Elastic Block Storage to provide persistent storage:
+
+$ aws ec2 create-volume --availability-zone $AZ --size $VOL_SIZE --volume-type gp2
+
+Note the volumeID that is generated. We will be using that in  the resulting block in our Kubernetes YAML
+
+Step 2: Since the Docker Registry is, itself, deployed as a Docker container, setting up the rest of your YAML file is pretty straightforward. I have put up a "registry.yaml" file that contains the necessary configurations.
+
+Step 3: As Jenkins is running in the "jenkins" namespace so we can deploy the registry deployment and service in the same namespace.
+
+$ kubectl apply -f dockerRegistry/registry.yaml
+
+
+Step 4: Once we apply the same we would get the following endpoint.
+
+resulting endpoint: registry.jenkins.svc.cluster.local
+
+Step 5: I only intended the registry to be exposed to resources in-cluster (for example, if the portion of your pipeline that builds containers is within the cluster, an ingress isn’t required to make the push) So lets create a ingress controller with tls enabled. The configurations cane be found in the file dockerRegistry/tls.yaml. This will restrict the access only to the cluster and the registry.
+
+Step 6: Lets apply the tls configs.
+
+$ kubectl apply -f dockerRegistry/tls.yaml
+
+Step 7: If you want to create the user, password and other details we cn use the below commnad and apply.
+
+$ kubectl create secret docker-registry --dry-run=true $secret_name \
+--docker-server=registry.jenkins.svc.cluster.local \
+--docker-username=user \
+--docker-password=password \
+--docker-email=snigdha.sambit.ak@gmail.com -o yaml > docker-secret.yaml
+
+$ kubectl apply -f docker-secret.yaml --namespace jenkins
+
+
+
+
+
+
+
+
+
+
 
 
 

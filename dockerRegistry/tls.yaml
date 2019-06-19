@@ -1,0 +1,23 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    kubernetes.io/tls-acme: 'true'
+  name: docker-registry
+  namespace: jenkins
+spec:
+  tls:
+  - hosts:
+    - registry.jenkins.svc.cluster.local
+    secretName: registry-tls
+  rules:
+  - host: registry.jenkins.svc.cluster.local
+    http:
+      paths:
+      - backend:
+          serviceName: docker-registry
+          servicePort: 5000
+        path: /
