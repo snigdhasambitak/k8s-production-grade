@@ -372,3 +372,69 @@ image list file : anchore_images
 Leave the rest of the options with the default settings.
 
 The build will fail if Anchore detects any stop build vulnerabilities. Of course, you also can define what triggers a stop.
+
+
+
+##Setup Nginx Ingress Controller manually. Configure proper routes between ingress and the application.
+
+Step 1: All resources for Nginx Ingress controller will be in a separate namespace, so let's create it:
+
+$ kubectl create namespace ingress
+
+
+Step 2: The second step is to create a default backend endpoint. Default endpoint redirects all requests which are not defined by Ingress rules: "nginxIngress/backend.yaml". It contaits the deployment and service for the backend.
+
+$ kubectl create -f backend.yaml -n=ingress
+
+
+Step 3: Now we need to create secrets to specify the SSL certificate for Nginx
+
+We can create a self-signed certificate using OpenSSL. The common name specified while generating the SSL certificate should be used as the host in your ingress config. We create secrets for the given key, certificate and dhparam files. Use corresponding file names for the key, certificate and dhparam.
+
+$ kubectl create secret tls tls-certificate --key <key-file>.key --cert <certificate-file>.crt -n=ingress
+$ kubectl create secret generic tls-dhparam --from-file=<dhparam-file>.pem -n=ingress
+
+Step 3: Now we can create a service for the controller. The service is of type LoadBalancer so that it is exposed outside the cluster.
+
+The config consists of the deployment and service for the nginx-ingress. The following can be observed from the config :
+
+The secret for the default SSL certificate and backend service are passed as args.
+The image nginx-ingress-controller:0.9.0-beta.5 is used.
+The tls-dhparam secret is mounted on a volume to be used by the controller.
+
+
+Create the controller by running:
+
+$ kubectl create -f nginx-controller.yaml -n=ingress
+
+
+Step 4: Now lets create 2 sample apps that we can use for testing the ingress controller.
+
+I have created 2 app definations which can be found : "nginxIngress/app1.yaml" and "nginxIngree/app2.yaml"
+
+Lets create these Resources:
+
+$ kubectl create -f app1.yaml -n=ingress
+
+$ kubectl create -f app2.yaml -n=ingress
+
+
+Step 5: Now lets define Ingress rules for load balancer status page: This can be found in the file nginxIngress/nginx-ingress.yaml
+
+$ kubectl create -f nginxingress.yaml -n=ingress
+
+Step 6: Now lets create Ingress rules for the sample web apps.
+This file can be found : nginxIngress/app-ingress.yaml
+
+$ kubectl create -f app-ingress.yaml -n=ingress
+
+Notice the nginx.ingress.kubernetes.io/rewrite-target: / annotation. We are using /app1 and /app2 paths, but the apps don’t exist there. This annotation redirects requests to the /.
+
+Step 7: Add test.dev.com domain to hosts file:
+$ echo "127.0.0.1 test.akomljen.com" | sudo tee -a /etc/hosts
+
+Step 8: You can verify everything by accessing at those endpoints:
+
+http://test.dev.com:30000/app1
+http://test.dev.com:30000/app2
+http://test.dev.com:32000/nginx_status
