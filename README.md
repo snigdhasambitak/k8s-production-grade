@@ -4,7 +4,7 @@
 
 I am using Terraform for creating a kubernetes cluster on AWS Platform.
 
-Step 1: Create the modules for the creation of the eks cluster(POP-DEV), master nodes, VPC and providers. Everything can be found in this directory.
+Step 1: Create the modules for the creation of the eks cluster(POP-DEV), master nodes, VPC and providers. Everything can be found in the root directory. the modules path is : "modules/eks/"
 
 Step 2: Initialize the Terraform state:  
 
@@ -50,15 +50,16 @@ ip-172-xx-xxx-29.eu-west-1.compute.internal    Ready    <none>   19d   v1.12.7
 
 Step 9: In order to delete the resources created for this EKS cluster, run the following commands:
 
-terraform plan -destroy -out POP-DEV-destroy-tf
-terraform apply "POP-DEV-destroy-tf"
+$ terraform plan -destroy -out POP-DEV-destroy-tf
 
+$ terraform apply "POP-DEV-destroy-tf"
 
 
 
 
 
 ## SETUP CI SERVER (JENKINS OR TOOL OF YOUR CHOICE) INSIDE THE KUBERNETES CLUSTER AND MAINTAIN THE HIGH AVAILABILITY OF THE JOBS CREATED. Please access the "Jenkins" folder from root for the config files.
+
 
 Step 1: Create a deployment file for jenkins and we can set up 3 replicas. This ensures 3 instances will be maintained by the Replication Controller in the event of failure at all time.
 
@@ -186,6 +187,7 @@ Step 5: Access the service from the URL: http://<ip>:<port>/index.php/Main_Page
 
 
 
+
 ##Setup a private docker registry to store the docker images. Configure restricted access between cluster to registry and Cluster to pipeline.
 
 Step 1: As we are using AWS so if you want the registry to be persistent, this will require a persistent volume of some kind. I’ll use the example of Elastic Block Storage to provide persistent storage:
@@ -240,31 +242,7 @@ Step 2: Configure Helm access with RBAC
 
 Helm relies on a service called tiller that requires special permission on the kubernetes cluster, so we need to build a Service Account for tiller to use. We’ll then apply this to the cluster.
 
-To create a new service account manifest:
-
-cat <<EoF > rbac.yaml
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: tiller
-  namespace: kube-system
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  name: tiller
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
-subjects:
-  - kind: ServiceAccount
-    name: tiller
-    namespace: kube-system
-EoF
-
-This file can be found under "helm/rbac.yaml"
+To create a new service account manifest. This file can be found under "helm/rbac.yaml"
 
 Next apply the config:
 
@@ -279,8 +257,7 @@ This will install tiller into the cluster which gives it access to manage resour
 
 To update Helm’s local list of Charts, run:
 
-helm repo update
-
+$ helm repo update
 
 Step 4: We can now install Anchore Engine in Kubernetes with Helm using the Anchore Engine Helm chart. The vaues file can be found: "anchoreEngine/anchorevalues.yaml". To do so, execute:
 
@@ -376,6 +353,7 @@ The build will fail if Anchore detects any stop build vulnerabilities. Of course
 
 ##Setup Nginx Ingress Controller manually. Configure proper routes between ingress and the application.
 
+
 Step 1: All resources for Nginx Ingress controller will be in a separate namespace, so let's create it:
 
 $ kubectl create namespace ingress
@@ -395,7 +373,7 @@ $ kubectl create secret generic tls-dhparam --from-file=<dhparam-file>.pem -n=in
 
 Step 3: Now we can create a service for the controller. The service is of type LoadBalancer so that it is exposed outside the cluster.
 
-The config consists of the deployment and service for the nginx-ingress. The following can be observed from the config :
+The config consists of the deployment and service for the nginx-ingress.
 
 The secret for the default SSL certificate and backend service are passed as args.
 The image nginx-ingress-controller:0.9.0-beta.5 is used.
@@ -538,6 +516,85 @@ To log into the Kiali UI, go to the Kiali login screen and enter the username an
 
 
 ## Setup mTLS authentication between microservices. Use self-signed certificates for secure communication between microservices.
+
+
+Istio can secure the communication between microservices without requiring application code changes. Security is provided by authenticating and encrypting communication paths within the cluster.
+
+Istio Citadel is an optional part of Istio's control plane components. When enabled, it provides each Envoy sidecar proxy with a strong (cryptographic) identity, in the form of a certificate. Identity is based on the microservice's service account and is independent of its specific network location, such as cluster or current IP address. Envoys then use the certificates to identify each other and establish an authenticated and encrypted communication channel between them.
+
+Citadel is responsible for, Providing each service with an identity representing its role, Providing a common trust root to allow Envoys to validate and authenticate each other and Providing a key management system, automating generation, distribution, and rotation of certificates and keys.
+
+When an application microservice connects to another microservice, the communication is redirected through the client side and server side Envoys. The end-to-end communication path is:
+
+1. Local TCP connection between the application and Envoy (client- and server-side);
+
+2. Mutually authenticated and encrypted connection between Envoy proxies.
+
+When Envoy proxies establish a connection, they exchange and validate certificates to confirm that each is indeed connected to a valid and expected peer.
+
+Step 1 : For Istio to work, Envoy proxies must be deployed as sidecars to each pod of the deployment. There are two ways of injecting the Istio sidecar into a pod: manually using the istioctl CLI tool or automatically using the Istio sidecar injector. Here we will use the automatic sidecar injection provided by Istio.
+
+
+$ kubectl label namespace default istio-injection=enabled
+
+$ kubectl get namespace -L istio-injection
+
+NAME             STATUS   AGE    ISTIO-INJECTION
+default          Active   2h      enabled
+istio-system     Active   3h
+...
+
+Step 2: Create 2 sample apps called app1.yaml and app2.yaml which can be found under the mTLS folder and deploy those in the default namespace.
+
+$ kubectl apply -f mTLS/app1.yaml
+
+$ kubectl apply -f mTLS/app2.yaml
+
+Step 3: Verify setup by sending an http request (using curl command) from any app1 pod to app2. All requests should success with HTTP code 200
+
+$ for from in "default"; do kubectl exec $(kubectl get pod -l app=app1 -n ${from} -o jsonpath={.items..metadata.name}) -c sleep -n ${from} -- curl http://app1.default:5000/ip -s -o /dev/null -w "app2.${from} to app1.default: %{http_code}\n"; done
+
+app2.default to app1.default: 200
+
+
+Step 4: Citadel is Istio's in-cluster Certificate Authority and is required for generating and managing cryptographic identities in the cluster. Verify Citadel is running:
+
+$ kubectl get deployment -l istio=citadel -n istio-system
+
+Expected output:
+
+NAME            DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+istio-citadel   1         1         1            1           15h
+
+
+Step 5: Define mTLS authentication policy for the app1 service. This file can be found as "mTLS/app1-authentification.yaml"
+
+$ kubectl create -f mTLS/app1-authentification.yaml
+
+policy.authentication.istio.io/mtls-to-app1 created
+
+Confirm the policy has been created:
+
+$ kubectl get policies.authentication.istio.io
+
+NAME              AGE
+mtls-to-app1      1m
+
+
+Step 6: Now we need to enable mTLS from app2 using a Destination rule. This file can be found as "mTLS/destination-rule.yaml"
+
+$ kubectl create -f destination-rule.yaml
+
+Output:
+```
+destinationrule.networking.istio.io/route-with-mtls-for-app1 created
+```
+
+Step 5: If mTLS is working correctly, the app2 should continue to operate as expected, without any user visible impact. Istio will automatically add (and manage) the required certificates and private keys
+
+
+
+
 
 ## Setup Kubernetes Dashboard and secure access to the dashboard using a read only token
 

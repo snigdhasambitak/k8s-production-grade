@@ -1,0 +1,10 @@
+apiVersion: authentication.istio.io/v1alpha1
+kind: Policy
+metadata:
+  name: mtls-to-app1
+  namespace: default
+spec:
+  targets:
+  - name: app1
+  peers:
+  - mtls:

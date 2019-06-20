@@ -1,0 +1,33 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: app2
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: app2
+    spec:
+      containers:
+      - name: app2
+        image: ibmcom/guestbook:v2
+        env:
+        - name: AUTHOR
+          value: app2
+        ports:
+        - containerPort: 3000
+          name: http
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app2
+spec:
+  ports:
+  - port: 80
+    name: http
+    targetPort: 3000
+  selector:
+    app: app2
