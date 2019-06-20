@@ -61,7 +61,9 @@ $ terraform apply "POP-DEV-destroy-tf"
 
 
 
-## SETUP CI SERVER (JENKINS OR TOOL OF YOUR CHOICE) INSIDE THE KUBERNETES CLUSTER AND MAINTAIN THE HIGH AVAILABILITY OF THE JOBS CREATED. Please access the "Jenkins" folder from root for the config files.
+## SETUP CI SERVER (JENKINS OR TOOL OF YOUR CHOICE) INSIDE THE KUBERNETES CLUSTER AND MAINTAIN THE HIGH AVAILABILITY OF THE JOBS CREATED. 
+
+Please access the "Jenkins" folder from root for the config files.
 
 
 Step 1: Create a deployment file for jenkins and we can set up 3 replicas. This ensures 3 instances will be maintained by the Replication Controller in the event of failure at all time.
