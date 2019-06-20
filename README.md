@@ -89,7 +89,7 @@ jenkins   1         1         1            1           3m
 We can also see that a single Pod has been created by invoking:
 
 $ kubectl get pods --namespace=jenkins
-NAME                       READY     STATUS    RESTARTS   AGE
+NAME                       READY     STATUS    RESTARTS    AGE
 jenkins-69278131955-31nj71   1/1       Running   0          7m
 
 Step 4: To make Jenkins accessible outside the Kubernetes cluster the Pod needs to be exposed as a Service. With a local deployment this means creating a NodePort service type. A NodePort service type exposes a service on a port on each node in the cluster. It’s then possible to access the service given the Node IP address and the service nodePort. Also, we have mentioned the nodeport as 30000. So you can access the application on port 30000. A simple service is defined in the file : jenkins-service.yaml
@@ -189,6 +189,7 @@ Step 5: Access the service from the URL: http://<ip>:<port>/index.php/Main_Page
 
 
 ##Setup a private docker registry to store the docker images. Configure restricted access between cluster to registry and Cluster to pipeline.
+
 
 Step 1: As we are using AWS so if you want the registry to be persistent, this will require a persistent volume of some kind. I’ll use the example of Elastic Block Storage to provide persistent storage:
 
