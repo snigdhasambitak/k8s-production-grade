@@ -86,12 +86,14 @@ Step 4: To validate that creating the deployment was successful you can invoke:
 
 $ kubectl get deployments --namespace=jenkins
 
+
 NAME      DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 jenkins   1         1         1            1           3m
 
 We can also see that a single Pod has been created by invoking:
 
 $ kubectl get pods --namespace=jenkins
+
 NAME                       READY     STATUS    RESTARTS    AGE
 jenkins-69278131955-31nj71   1/1       Running   0          7m
 
@@ -133,13 +135,14 @@ $ kubectl create -f jenkins/jenkins-hpa.yaml --namespace=jenkins
 
 Step 10: To get HPA info and description and check that resource metrics data:
 
-$ kubectl get hpa
+$ kubectl get hpa --namespace=jenkins
+
 
 NAME          REFERENCE                TARGETS                     MINPODS   MAXPODS   REPLICAS    AGE
 jenkins-hpa   Deployment/jenkins  1253376 / 500Mi, 0% / 50%          1         10        3          6m
 
 
-$ kubectl describe hpa
+$ kubectl describe hpa --namespace=jenkins
 
 Name:                                                  jenkins-hpa
 Namespace:                                             jenkins
@@ -174,7 +177,7 @@ Step 2: Now create a deployment and service defination file which contains both 
 
 Step 3: Apply the mediawiki yaml files
 
-$ kubectl apply -f mediawiki/mediawiki.yaml
+$ kubectl apply -f mediawiki/mediawiki.yaml --namespace mediawiki
 
 Step 4: Verify that the service is up and running
 
