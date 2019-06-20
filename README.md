@@ -32,12 +32,15 @@ $ echo "export KUBECONFIG=${KUBECONFIG}" >> ${HOME}/.bashrc
 Step 7: The terraform state also contains a config-map we can use for our EKS workers. We can view, save and apply the config maps.
 
 #View
+
 $ terraform output config-map
 
 #Save
+
 $ terraform output config-map > /tmp/config-map-aws-auth.yml
 
 #Apply
+
 $ kubectl apply -f /tmp/config-map-aws-auth.yml
 
 Step 8: Confirm that the nodes are available. If available then we have a working cluster as follows:
