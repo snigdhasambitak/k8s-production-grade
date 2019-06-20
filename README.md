@@ -4,7 +4,7 @@
 
 I am using Terraform for creating a kubernetes cluster on AWS Platform.
 
-Step 1: Create the modules for the creation of the eks cluster, master nodes, VPC and providers. Everything can be found in this directory.
+Step 1: Create the modules for the creation of the eks cluster(POP-DEV), master nodes, VPC and providers. Everything can be found in this directory.
 
 Step 2: Initialize the Terraform state:  
 
@@ -52,7 +52,6 @@ Step 9: In order to delete the resources created for this EKS cluster, run the f
 
 terraform plan -destroy -out POP-DEV-destroy-tf
 terraform apply "POP-DEV-destroy-tf"
-
 
 
 
@@ -536,3 +535,35 @@ $ kubectl -n istio-system port-forward $(kubectl -n istio-system get pod -l app=
 Now in the local system Kiali UI is available in http://localhost:20001/kiali/console.
 
 To log into the Kiali UI, go to the Kiali login screen and enter the username and passphrase which is by default asmin:admin
+
+
+## Setup mTLS authentication between microservices. Use self-signed certificates for secure communication between microservices.
+
+## Setup Kubernetes Dashboard and secure access to the dashboard using a read only token
+
+Step 1: Deploy the Kubernetes dashboard to your cluster. I have it stores in the path "kubernetesDashboard/kubernetes-dashboard.yaml"
+
+$ kubectl apply -f kubernetesDashboard/kubernetes-dashboard.yaml
+
+secret "kubernetes-dashboard-certs" created
+serviceaccount "kubernetes-dashboard" created
+role "kubernetes-dashboard-minimal" created
+rolebinding "kubernetes-dashboard-minimal" created
+deployment "kubernetes-dashboard" created
+service "kubernetes-dashboard" created
+
+Step 2: Since this is deployed to our private cluster, we need to access it via a proxy. Kube-proxy is available to proxy our requests to the dashboard service.
+
+$ kubectl proxy --port=8080 --address='0.0.0.0' --disable-filter=true &
+
+This will start the proxy, listen on port 8080, listen on all interfaces, and will disable the filtering of non-localhost requests. This command will continue to run in the background of the current terminal’s session.
+
+Step 3: Now we can access the Kubernetes Dashboard using the url : http://localhost:8080/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/#!/login
+
+Step 4: Now to get the read only token we need to open a New Terminal Tab and use the aws-iam-authenticator with the clusted id:
+
+$ aws-iam-authenticator token -i POP-DEV
+
+{"kind":"ExecCredential","apiVersion":"client.authentication.k8s.io/v1alpha1","spec":{},"status":{"token":"k8s-aws-v1.aHR0cHM6Ly9zdHMuYW1hem9uYXdzLmNvbS8_QWN0aW9uPUdldENhbGxlcklkZW50aXR5JlZlcnNpb249MjAxMS0wNi0xNSZYLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSahjvahsdvFo1UkRZQkRBJTJGMjAxOTA2MTklMkZ1cy1lYXN0LTElMkZzdHMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDE5MDYxOVQxNjM1MjlaJlgtQW16LUV4cGlyZXM9NjAmWC1BbXotU2lnbmVkSGVhhhb3N0JTNCeC1rOHMtYXdzLWlkJlgtQW16LVNpZ25hdHVyZT1kMWI2NGU2MzMwMDY3YTFkY2I3ZjMyZDkzZmFmZDRhYmU1MGRkZTA2YWNhYjgwNjRiYzE3YjVkMTlmYTU3ZDE0"}}
+
+Step 5: Copy the output of this command and then click the radio button next to Token then in the text field below paste the output from the last command.

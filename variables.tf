@@ -1,9 +1,9 @@
 # Variables Configuration
 
 variable "cluster-name" {
-  default     = "test-cluster"
+  default     = "POP-DEV"
   type        = "string"
-  description = "The name of your EKS Cluster"
+  description = "The name of your Cluster"
 }
 
 variable "aws-region" {
