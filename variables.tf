@@ -1,19 +1,19 @@
 # Variables Configuration
 
 variable "cluster-name" {
-  default     = "POP-DEV"
+  default     = "EKS-DEMO"
   type        = "string"
   description = "The name of your Cluster"
 }
 
 variable "aws-region" {
-  default     = "eu-west-1"
+  default     = "us-east-2"
   type        = "string"
   description = "The AWS Region to deploy EKS"
 }
 
 variable "k8s-version" {
-  default     = "1.12"
+  default     = "1.13"
   type        = "string"
   description = "Required K8s version"
 }
@@ -25,7 +25,7 @@ variable "vpc-subnet-cidr" {
 }
 
 variable "node-instance-type" {
-  default     = "m4.large"
+  default     = "t2.medium"
   type        = "string"
   description = "Worker Node EC2 instance type"
 }
