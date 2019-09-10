@@ -93,7 +93,7 @@ data "aws_ami" "eks-worker-ami" {
   }
 
   most_recent = true
-  owners      = ["self"] # Amazon
+  owners      = ["602401143452"] # Amazon EKS AMI Account ID
 }
 
 # EKS currently documents this required userdata for EKS worker nodes to
@@ -114,7 +114,7 @@ resource "aws_launch_configuration" "eks" {
   iam_instance_profile        = "${aws_iam_instance_profile.node.name}"
   image_id                    = "${data.aws_ami.eks-worker-ami.id}"
   instance_type               = "${var.node-instance-type}"
-  name_prefix                 = "${var.cluster-name}-eks-"
+  name_prefix                 = "${var.cluster-name}"
   security_groups             = ["${aws_security_group.node.id}"]
   user_data_base64            = "${base64encode(local.node-userdata)}"
 
@@ -129,7 +129,7 @@ resource "aws_autoscaling_group" "eks" {
   max_size             = "${var.max-size}"
   min_size             = "${var.min-size}"
   name                 = "${var.cluster-name}-eks-asg"
-  vpc_zone_identifier  = ["${aws_subnet.eks.*.id}"]
+  vpc_zone_identifier  = "${aws_subnet.eks[*].id}"
 
   tag {
     key                 = "Name"
